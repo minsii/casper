@@ -92,6 +92,9 @@ int CSPU_shmbuf_regist(CSPU_comm_t * ug_comm, MPI_Aint size, int disp_unit, MPI_
     CSP_CALLMPI(JUMP, PMPI_Comm_rank(ug_comm->local_user_comm, &ulrank));
     CSP_CALLMPI(JUMP, PMPI_Comm_rank(CSP_PROC.local_comm, &lrank));
 
+    /* Ensure all processes have arrived before connecting to ghost. */
+    CSP_CALLMPI(JUMP, PMPI_Barrier(comm));
+
     if (ulrank == 0) {
         /* Send command to root ghost.
          * Do not mlock ghost because only one node. */
