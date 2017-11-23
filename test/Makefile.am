@@ -52,11 +52,15 @@ noinst_PROGRAMS = \
 	isend_wait_anysrc	\
 	isend_wait_anysrc_anytag   \
 	isend_wait_anysrc_anytag_l \
-	isend_wait_anysrc_notag   \
-	isend_wait_anysrc_notag_l \
-	isend_wait_offload_minsz  \
-	isend_wait_nodtypeinfo    \
-	isend_wait_deriveddtype   \
+	isend_wait_anysrc_notag    \
+	isend_wait_anysrc_notag_l  \
+	isend_wait_offload_minsz   \
+	isend_wait_nodtypeinfo     \
+	isend_wait_deriveddtype    \
+	isend_wait_ddt_r           \
+	isend_wait_ddt_s     \
+	isend_wait_ddt_sr    \
+	isend_wait_ddt_sr_offload_minsz  \
 	isend_waitall		\
 	isend_waitall_l		\
 	isendirecv_waitall	\
@@ -109,6 +113,18 @@ isend_wait_nodtypeinfo_CPPFLAGS  = -DUSE_NODTYPE $(AM_CPPFLAGS)
 
 isend_wait_deriveddtype_SOURCES   = isend_wait.c
 isend_wait_deriveddtype_CPPFLAGS  = -DUSE_DERIVED_DTYPE $(AM_CPPFLAGS)
+
+isend_wait_ddt_r_SOURCES    = isend_wait_ddt.c
+isend_wait_ddt_r_CPPFLAGS   = -DUSE_RECV_DDT $(AM_CPPFLAGS)
+
+isend_wait_ddt_s_SOURCES    = isend_wait_ddt.c
+isend_wait_ddt_s_CPPFLAGS   = -DUSE_SEND_DDT $(AM_CPPFLAGS)
+
+isend_wait_ddt_sr_SOURCES    = isend_wait_ddt.c
+isend_wait_ddt_sr_CPPFLAGS   = -DUSE_SEND_DDT -DUSE_RECV_DDT $(AM_CPPFLAGS)
+
+isend_wait_ddt_sr_offload_minsz_SOURCES    = isend_wait_ddt.c
+isend_wait_ddt_sr_offload_minsz_CPPFLAGS   = -DUSE_SEND_DDT -DUSE_RECV_DDT -DUSE_OFFLOAD_MIN_MSGSZ $(AM_CPPFLAGS)
 
 isend_waitall_l_SOURCES     = isend_waitall.c
 isend_waitall_l_CPPFLAGS    = -DTEST_LMSG $(AM_CPPFLAGS)
