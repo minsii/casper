@@ -123,7 +123,28 @@ typedef enum {
 #endif
 
     CSP_DATATYPE_MAX
-} CSPU_datatype_predefine_id_t;
+} CSP_datatype_predefine_id_t;
+
+typedef enum {
+    CSP_DATATYPE_CONTIGUOUS,
+    CSP_DATATYPE_VECTOR,
+    CSP_DATATYPE_HVECTOR,
+    CSP_DATATYPE_INDEXED,
+    CSP_DATATYPE_HINDEXED,
+    CSP_DATATYPE_INDEXED_BLOCK,
+    CSP_DATATYPE_HINDEXED_BLOCK,
+    CSP_DATATYPE_STRUCT,
+    CSP_DATATYPE_SUBARRAY,
+    CSP_DATATYPE_DARRAY,
+
+    /* FIXME: these are predefined but unnamed... */
+    CSP_DATATYPE_F90_REAL,
+    CSP_DATATYPE_F90_COMPLEX,
+    CSP_DATATYPE_F90_INTEGER,
+
+    CSP_DATATYPE_RESIZED,
+    CSP_DATATYPE_DERIVED_MAX,
+} CSP_datatype_id_t;
 
 static inline void CSP_datatype_fill_predefined_table(MPI_Datatype * table)
 {

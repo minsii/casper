@@ -149,6 +149,36 @@ extern int CSPG_shmbuf_regist_cwp_handler(CSP_cwp_pkt_t * pkt);
 extern int CSPG_shmbuf_free_cwp_root_handler(CSP_cwp_pkt_t * pkt, int user_local_rank);
 extern int CSPG_shmbuf_free_cwp_handler(CSP_cwp_pkt_t * pkt);
 
+extern int CSPG_dtype_commit_cwp_root_handler(CSP_cwp_pkt_t * pkt, int user_local_rank);
+extern int CSPG_dtype_commit_cwp_handler(CSP_cwp_pkt_t * pkt);
+extern int CSPG_dtype_free_cwp_root_handler(CSP_cwp_pkt_t * pkt, int user_local_rank);
+extern int CSPG_dtype_free_cwp_handler(CSP_cwp_pkt_t * pkt);
+
+extern int CSPG_dtype_contig_regist_cwp_root_handler(CSP_cwp_pkt_t * pkt, int user_local_rank);
+extern int CSPG_dtype_contig_regist_cwp_handler(CSP_cwp_pkt_t * pkt);
+extern int CSPG_dtype_vector_regist_cwp_root_handler(CSP_cwp_pkt_t * pkt, int user_local_rank);
+extern int CSPG_dtype_vector_regist_cwp_handler(CSP_cwp_pkt_t * pkt);
+extern int CSPG_dtype_hvector_regist_cwp_root_handler(CSP_cwp_pkt_t * pkt, int user_local_rank);
+extern int CSPG_dtype_hvector_regist_cwp_handler(CSP_cwp_pkt_t * pkt);
+extern int CSPG_dtype_indexed_regist_cwp_root_handler(CSP_cwp_pkt_t * pkt, int user_local_rank);
+extern int CSPG_dtype_indexed_regist_cwp_handler(CSP_cwp_pkt_t * pkt);
+extern int CSPG_dtype_hindexed_regist_cwp_root_handler(CSP_cwp_pkt_t * pkt, int user_local_rank);
+extern int CSPG_dtype_hindexed_regist_cwp_handler(CSP_cwp_pkt_t * pkt);
+extern int CSPG_dtype_idx_blk_regist_cwp_root_handler(CSP_cwp_pkt_t * pkt, int user_local_rank);
+extern int CSPG_dtype_idx_blk_regist_cwp_handler(CSP_cwp_pkt_t * pkt);
+extern int CSPG_dtype_hidx_blk_regist_cwp_root_handler(CSP_cwp_pkt_t * pkt, int user_local_rank);
+extern int CSPG_dtype_hidx_blk_regist_cwp_handler(CSP_cwp_pkt_t * pkt);
+extern int CSPG_dtype_subarray_regist_cwp_root_handler(CSP_cwp_pkt_t * pkt, int user_local_rank);
+extern int CSPG_dtype_subarray_regist_cwp_handler(CSP_cwp_pkt_t * pkt);
+extern int CSPG_dtype_darray_regist_cwp_root_handler(CSP_cwp_pkt_t * pkt, int user_local_rank);
+extern int CSPG_dtype_darray_regist_cwp_handler(CSP_cwp_pkt_t * pkt);
+extern int CSPG_dtype_struct_regist_cwp_root_handler(CSP_cwp_pkt_t * pkt, int user_local_rank);
+extern int CSPG_dtype_struct_regist_cwp_handler(CSP_cwp_pkt_t * pkt);
+extern int CSPG_dtype_resized_regist_cwp_root_handler(CSP_cwp_pkt_t * pkt, int user_local_rank);
+extern int CSPG_dtype_resized_regist_cwp_handler(CSP_cwp_pkt_t * pkt);
+extern int CSPG_dtype_dup_regist_cwp_root_handler(CSP_cwp_pkt_t * pkt, int user_local_rank);
+extern int CSPG_dtype_dup_regist_cwp_handler(CSP_cwp_pkt_t * pkt);
+
 /* ======================================================================
  * MLOCK related definition (ghost side).
  * ====================================================================== */
@@ -162,5 +192,39 @@ extern int CSPG_mlock_release(void);
  * ====================================================================== */
 extern int CSPG_datatype_init(void);
 extern int CSPG_datatype_destory(void);
+/* See CSPG_datatype_regist_cwp_handler above */
+
+#define CSPG_DEFINE_GENERIC_CWP_ROOT_HANDLER(cmd)                                    \
+int CSPG_##cmd##_cwp_root_handler(CSP_cwp_pkt_t * pkt,                               \
+                                  int user_local_rank CSP_ATTRIBUTE((unused)))       \
+{                                                                                    \
+    int mpi_errno = MPI_SUCCESS;                                                     \
+    MPI_Request ibcast_req = MPI_REQUEST_NULL;                                       \
+    CSP_cwp_##cmd##_pkt_t *cmd_pkt = &pkt->u.fnc_##cmd;                              \
+    /* broadcast to other local ghosts */                                            \
+    mpi_errno = CSPG_cwp_try_bcast(pkt, &ibcast_req);                                \
+    CSP_CHKMPIFAIL_JUMP(mpi_errno);                                                  \
+    /* only local work, no sync with other ghosts. */                                \
+    mpi_errno = cmd##_impl(cmd_pkt);                                                 \
+    CSP_CHKMPIFAIL_JUMP(mpi_errno);                                                  \
+    CSP_CALLMPI(JUMP, PMPI_Wait(&ibcast_req, MPI_STATUS_IGNORE));                    \
+  fn_exit:                                                                           \
+    return mpi_errno;                                                                \
+  fn_fail:                                                                           \
+    goto fn_exit;                                                                    \
+}
+
+#define CSPG_DEFINE_GENERIC_CWP_HANDLER(cmd)                                         \
+int CSPG_##cmd##_cwp_handler(CSP_cwp_pkt_t * pkt)                                    \
+{                                                                                    \
+    int mpi_errno = MPI_SUCCESS;                                                     \
+    CSP_cwp_##cmd##_pkt_t *cmd_pkt = &pkt->u.fnc_##cmd;                              \
+    mpi_errno = cmd##_impl(cmd_pkt);                                                 \
+    CSP_CHKMPIFAIL_JUMP(mpi_errno);                                                  \
+  fn_exit:                                                                           \
+    return mpi_errno;                                                                \
+  fn_fail:                                                                           \
+    goto fn_exit;                                                                    \
+}
 
 #endif /* CSPG_H_INCLUDED */

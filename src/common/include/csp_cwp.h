@@ -9,6 +9,7 @@
 #include "csp.h"
 #include "csp_mlock.h"
 #include "csp_comm.h"
+#include "csp_datatype.h"
 
 /* ======================================================================
  * Command wire protocol (CWP) common definition (packet, tags).
@@ -38,6 +39,20 @@ typedef enum {
     CSP_CWP_FNC_UGCOMM_FREE,
     CSP_CWP_FNC_SHMBUF_REGIST,
     CSP_CWP_FNC_SHMBUF_FREE,
+    CSP_CWP_FNC_DTYPE_CONTIG_REGIST,
+    CSP_CWP_FNC_DTYPE_VECTOR_REGIST,
+    CSP_CWP_FNC_DTYPE_HVECTOR_REGIST,
+    CSP_CWP_FNC_DTYPE_IDX_BLK_REGIST,
+    CSP_CWP_FNC_DTYPE_HIDX_BLK_REGIST,
+    CSP_CWP_FNC_DTYPE_INDEXED_REGIST,
+    CSP_CWP_FNC_DTYPE_HINDEXED_REGIST,
+    CSP_CWP_FNC_DTYPE_STRUCT_REGIST,
+    CSP_CWP_FNC_DTYPE_SUBARRAY_REGIST,
+    CSP_CWP_FNC_DTYPE_DARRAY_REGIST,
+    CSP_CWP_FNC_DTYPE_RESIZED_REGIST,
+    CSP_CWP_FNC_DTYPE_DUP_REGIST,
+    CSP_CWP_FNC_DTYPE_COMMIT,
+    CSP_CWP_FNC_DTYPE_FREE,
     CSP_CWP_FNC_FINALIZE,
     CSP_MLOCK_ACQUIRE,
     CSP_MLOCK_DISCARD,
@@ -58,6 +73,96 @@ typedef struct CSP_cwp_winalloc_pkt {
 typedef struct CSP_cwp_winfree_pkt {
     int user_local_root;
 } CSP_cwp_fnc_winfree_pkt_t;
+
+typedef struct CSP_cwp_dtype_contig_regist_pkt {
+    int user_local_root;
+    CSP_datatype_id_t dtype_id;
+    struct {
+        int count;
+    } param;
+} CSP_cwp_dtype_contig_regist_pkt_t;
+
+typedef struct CSP_cwp_dtype_vector_regist_pkt {
+    int user_local_root;
+    CSP_datatype_id_t dtype_id;
+    struct {
+        int count;
+        int blocklength;
+        int stride;
+    } param;
+} CSP_cwp_dtype_vector_regist_pkt_t;
+
+typedef struct CSP_cwp_dtype_hvector_regist_pkt {
+    int user_local_root;
+    CSP_datatype_id_t dtype_id;
+    struct {
+        int count;
+        int blocklength;
+        MPI_Aint stride;
+    } param;
+} CSP_cwp_dtype_hvector_regist_pkt_t;
+
+typedef struct CSP_cwp_dtype_idx_blk_regist_pkt {
+    int user_local_root;
+    CSP_datatype_id_t dtype_id;
+    struct {
+        int count;
+        int blocklength;
+    } param;
+} CSP_cwp_dtype_idx_blk_regist_pkt_t;
+
+typedef CSP_cwp_dtype_idx_blk_regist_pkt_t CSP_cwp_dtype_hidx_blk_regist_pkt_t;
+typedef CSP_cwp_dtype_contig_regist_pkt_t CSP_cwp_dtype_indexed_regist_pkt_t;
+typedef CSP_cwp_dtype_contig_regist_pkt_t CSP_cwp_dtype_hindexed_regist_pkt_t;
+
+typedef struct CSP_cwp_dtype_struct_regist_pkt {
+    int user_local_root;
+    CSP_datatype_id_t dtype_id;
+    struct {
+        int count;
+    } param;
+} CSP_cwp_dtype_struct_regist_pkt_t;
+
+typedef struct CSP_cwp_dtype_subarray_regist_pkt {
+    int user_local_root;
+    CSP_datatype_id_t dtype_id;
+    struct {
+        int ndims;
+        int order;
+    } param;
+} CSP_cwp_dtype_subarray_regist_pkt_t;
+
+typedef struct CSP_cwp_dtype_darray_regist_pkt {
+    int user_local_root;
+    CSP_datatype_id_t dtype_id;
+    struct {
+        int size;
+        int rank;
+        int ndims;
+        int order;
+    } param;
+} CSP_cwp_dtype_darray_regist_pkt_t;
+
+typedef struct CSP_cwp_dtype_resized_regist_pkt {
+    int user_local_root;
+    CSP_datatype_id_t dtype_id;
+    struct {
+        MPI_Aint lb;
+        MPI_Aint extent;
+    } param;
+} CSP_cwp_dtype_resized_regist_pkt_t;
+
+typedef struct CSP_cwp_dtype_dup_regist_pkt {
+    int user_local_root;
+} CSP_cwp_dtype_dup_regist_pkt_t;
+
+typedef struct CSP_cwp_dtype_free_pkt {
+    int user_local_root;
+} CSP_cwp_dtype_free_pkt_t;
+
+typedef struct CSP_cwp_dtype_commit_pkt {
+    int user_local_root;
+} CSP_cwp_dtype_commit_pkt_t;
 
 typedef struct CSP_cwp_shmbuf_regist_pkt {
     int user_local_root;
@@ -100,6 +205,20 @@ typedef struct CSP_cwp_pkt {
         CSP_cwp_fnc_winfree_pkt_t fnc_winfree;
         CSP_cwp_shmbuf_regist_pkt_t fnc_shmbuf_regist;
         CSP_cwp_shmbuf_free_pkt_t fnc_shmbuf_free;
+        CSP_cwp_dtype_contig_regist_pkt_t fnc_dtype_contig_regist;
+        CSP_cwp_dtype_vector_regist_pkt_t fnc_dtype_vector_regist;
+        CSP_cwp_dtype_hvector_regist_pkt_t fnc_dtype_hvector_regist;
+        CSP_cwp_dtype_idx_blk_regist_pkt_t fnc_dtype_idx_blk_regist;
+        CSP_cwp_dtype_hidx_blk_regist_pkt_t fnc_dtype_hidx_blk_regist;
+        CSP_cwp_dtype_indexed_regist_pkt_t fnc_dtype_indexed_regist;
+        CSP_cwp_dtype_hindexed_regist_pkt_t fnc_dtype_hindexed_regist;
+        CSP_cwp_dtype_struct_regist_pkt_t fnc_dtype_struct_regist;
+        CSP_cwp_dtype_subarray_regist_pkt_t fnc_dtype_subarray_regist;
+        CSP_cwp_dtype_darray_regist_pkt_t fnc_dtype_darray_regist;
+        CSP_cwp_dtype_resized_regist_pkt_t fnc_dtype_resized_regist;
+        CSP_cwp_dtype_dup_regist_pkt_t fnc_dtype_dup_regist;
+        CSP_cwp_dtype_free_pkt_t fnc_dtype_free;
+        CSP_cwp_dtype_commit_pkt_t fnc_dtype_commit;
         CSP_cwp_fnc_ugcomm_create_pkt_t fnc_ugcomm_create;
         CSP_cwp_fnc_ugcomm_free_pkt_t fnc_ugcomm_free;
         CSP_cwp_mlock_acquire_pkt_t lock_acquire;

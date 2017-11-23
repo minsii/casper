@@ -33,6 +33,7 @@ typedef struct CSPU_datatype_db {
 
     /* predefined datatype mapping for each ghost process */
     CSPU_datatype_g_hash_t *g_predefined_hashs;
+    CSPU_datatype_g_hash_t *g_dtype_hashs;
 } CSPU_datatype_db_t;
 
 extern CSPU_datatype_db_t CSPU_datatype_db;
@@ -110,6 +111,11 @@ static inline int CSPU_datatype_get_g_handle(MPI_Datatype myhandle, int ghost_lr
         CSPU_datatype_g_hash_get(CSPU_datatype_db.g_predefined_hashs[ghost_lrank],
                                  myhandle, &g_handle, &found);
     }
+    else {
+        CSPU_datatype_g_hash_get(CSPU_datatype_db.g_dtype_hashs[ghost_lrank], myhandle,
+                                 &g_handle, &found);
+    }
+
 
     /* Must be found in one of the hashes.
      * Not sure if DATATYPE_NULL is a valid datatype on other processes,
@@ -127,5 +133,40 @@ static inline int CSPU_datatype_get_g_handle(MPI_Datatype myhandle, int ghost_lr
   fn_fail:
     goto fn_exit;
 }
+
+/* Complete datatype register: receive remote handler and store in local hash. */
+static inline int CSPU_datatype_regist_complete(MPI_Datatype newtype)
+{
+    int mpi_errno = MPI_SUCCESS;
+    MPI_Request *reqs = NULL;
+    MPI_Datatype *g_newtypes = NULL;
+    int i;
+
+    reqs = CSP_calloc(CSP_ENV.num_g, sizeof(MPI_Request));
+    g_newtypes = CSP_calloc(CSP_ENV.num_g, sizeof(MPI_Datatype));
+    for (i = 0; i < CSP_ENV.num_g; i++) {
+        /* Receive datatype handler from each ghost */
+        CSP_CALLMPI(JUMP, PMPI_Irecv(&g_newtypes[i], sizeof(MPI_Datatype),
+                                     MPI_BYTE, CSP_PROC.user.g_lranks[i], CSP_CWP_PARAM_TAG,
+                                     CSP_PROC.local_comm, &reqs[i]));
+    }
+    CSP_CALLMPI(JUMP, PMPI_Waitall(CSP_ENV.num_g, reqs, MPI_STATUS_IGNORE));
+
+    for (i = 0; i < CSP_ENV.num_g; i++) {
+        CSPU_datatype_g_hash_add(&CSPU_datatype_db.g_dtype_hashs[i], newtype, g_newtypes[i]);
+        CSP_DBG_PRINT("DTYPE: registered datatype 0x%lx -> 0x%lx on ghost %d\n",
+                      (MPI_Aint) newtype, (MPI_Aint) g_newtypes[i], i);
+    }
+
+  fn_exit:
+    if (reqs)
+        free(reqs);
+    if (g_newtypes)
+        free(g_newtypes);
+    return mpi_errno;
+  fn_fail:
+    goto fn_exit;
+}
+
 
 #endif /* CSPU_DATATYPE_H_ */

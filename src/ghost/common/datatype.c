@@ -9,53 +9,23 @@
 #include <string.h>
 #include "cspg.h"
 
-typedef struct datatype_ddt_elem {
-    MPI_Datatype handle;
-    struct datatype_ddt_elem *next;
-} datatype_ddt_elem_t;
-
-typedef struct CSPG_datatype_db {
-    struct {
-        datatype_ddt_elem_t *head, *tail;
-        int count;
-    } regist_ddt_list;
-} CSPG_datatype_db_t;
-
-CSPG_datatype_db_t datatype_db;
-
-static void datatype_regist_ddts_init(void)
-{
-    datatype_db.regist_ddt_list.head = NULL;
-    datatype_db.regist_ddt_list.tail = NULL;
-    datatype_db.regist_ddt_list.count = 0;
-}
-
-static int datatype_regist_ddts_destroy(void)
+static inline int dtype_commit_impl(CSP_cwp_dtype_commit_pkt_t * dtype_commit_pkt)
 {
     int mpi_errno = MPI_SUCCESS;
-    datatype_ddt_elem_t *elem = NULL, *prev_elem = NULL;
+    MPI_Datatype datatype_handle = MPI_DATATYPE_NULL;
+    char ack;
 
-    if (datatype_db.regist_ddt_list.head == NULL) {
-        CSP_DBG_ASSERT(datatype_db.regist_ddt_list.tail == NULL &&
-                       datatype_db.regist_ddt_list.count == 0);
-        goto fn_exit;
-    }
+    /* Receive the handle of my ug_comm from user root */
+    CSP_CALLMPI(JUMP, PMPI_Recv(&datatype_handle, sizeof(MPI_Datatype), MPI_BYTE,
+                                dtype_commit_pkt->user_local_root, CSP_CWP_PARAM_TAG,
+                                CSP_PROC.local_comm, MPI_STATUS_IGNORE));
 
-    /* Destroy all registered derived datatypes */
-    elem = datatype_db.regist_ddt_list.head;
-    while (elem != NULL) {
-        prev_elem = elem;
-        elem = elem->next;
+    CSPG_DBG_PRINT("DTYPE: commit datatype 0x%lx\n", (MPI_Aint) datatype_handle);
+    CSP_CALLMPI(JUMP, PMPI_Type_commit(&datatype_handle));
 
-        CSPG_DBG_PRINT("DATATYPE: free regist ddt 0x%x, count=%d\n", prev_elem->handle,
-                       datatype_db.regist_ddt_list.count);
-
-        CSP_CALLMPI(JUMP, PMPI_Type_free(&prev_elem->handle));
-        free(prev_elem);
-        datatype_db.regist_ddt_list.count--;
-    }
-
-    CSP_DBG_ASSERT(datatype_db.regist_ddt_list.count == 0);
+    /* Send ack back thus the user knows it is ready to offload requests. */
+    CSP_CALLMPI(JUMP, PMPI_Send(&ack, 1, MPI_CHAR, dtype_commit_pkt->user_local_root,
+                                CSP_CWP_PARAM_TAG, CSP_PROC.local_comm));
 
   fn_exit:
     return mpi_errno;
@@ -63,12 +33,92 @@ static int datatype_regist_ddts_destroy(void)
     goto fn_exit;
 }
 
+static inline int dtype_free_impl(CSP_cwp_dtype_free_pkt_t * dtype_free_pkt)
+{
+    int mpi_errno = MPI_SUCCESS;
+    MPI_Datatype datatype_handle = MPI_DATATYPE_NULL;
+
+    /* Receive the handle of my ug_comm from user root */
+    CSP_CALLMPI(JUMP, PMPI_Recv(&datatype_handle, sizeof(MPI_Datatype), MPI_BYTE,
+                                dtype_free_pkt->user_local_root, CSP_CWP_PARAM_TAG,
+                                CSP_PROC.local_comm, MPI_STATUS_IGNORE));
+
+    CSPG_DBG_PRINT("DTYPE: free datatype 0x%lx\n", (MPI_Aint) datatype_handle);
+    CSP_CALLMPI(JUMP, PMPI_Type_free(&datatype_handle));
+
+  fn_exit:
+    return mpi_errno;
+  fn_fail:
+    goto fn_exit;
+}
+
+/* *INDENT-OFF* */
+CSPG_DEFINE_GENERIC_CWP_ROOT_HANDLER(dtype_free)
+CSPG_DEFINE_GENERIC_CWP_HANDLER(dtype_free)
+
+CSPG_DEFINE_GENERIC_CWP_ROOT_HANDLER(dtype_commit)
+CSPG_DEFINE_GENERIC_CWP_HANDLER(dtype_commit)
+/* *INDENT-ON* */
+
 int CSPG_datatype_destory(void)
 {
-    /* Terminate ensures all local users have been finalizing. */
+    return MPI_SUCCESS;
+}
 
-    CSPG_DBG_PRINT("DATATYPE: destroy regist_ddt_list\n");
-    return datatype_regist_ddts_destroy();
+static void dtype_regist_handlers(void)
+{
+    CSPG_cwp_register_root_handler(CSP_CWP_FNC_DTYPE_CONTIG_REGIST,
+                                   CSPG_dtype_contig_regist_cwp_root_handler);
+    CSPG_cwp_register_root_handler(CSP_CWP_FNC_DTYPE_VECTOR_REGIST,
+                                   CSPG_dtype_vector_regist_cwp_root_handler);
+    CSPG_cwp_register_root_handler(CSP_CWP_FNC_DTYPE_HVECTOR_REGIST,
+                                   CSPG_dtype_hvector_regist_cwp_root_handler);
+    CSPG_cwp_register_root_handler(CSP_CWP_FNC_DTYPE_IDX_BLK_REGIST,
+                                   CSPG_dtype_idx_blk_regist_cwp_root_handler);
+    CSPG_cwp_register_root_handler(CSP_CWP_FNC_DTYPE_HIDX_BLK_REGIST,
+                                   CSPG_dtype_hidx_blk_regist_cwp_root_handler);
+    CSPG_cwp_register_root_handler(CSP_CWP_FNC_DTYPE_INDEXED_REGIST,
+                                   CSPG_dtype_indexed_regist_cwp_root_handler);
+    CSPG_cwp_register_root_handler(CSP_CWP_FNC_DTYPE_HINDEXED_REGIST,
+                                   CSPG_dtype_hindexed_regist_cwp_root_handler);
+    CSPG_cwp_register_root_handler(CSP_CWP_FNC_DTYPE_STRUCT_REGIST,
+                                   CSPG_dtype_struct_regist_cwp_root_handler);
+    CSPG_cwp_register_root_handler(CSP_CWP_FNC_DTYPE_SUBARRAY_REGIST,
+                                   CSPG_dtype_subarray_regist_cwp_root_handler);
+    CSPG_cwp_register_root_handler(CSP_CWP_FNC_DTYPE_DARRAY_REGIST,
+                                   CSPG_dtype_darray_regist_cwp_root_handler);
+    CSPG_cwp_register_root_handler(CSP_CWP_FNC_DTYPE_RESIZED_REGIST,
+                                   CSPG_dtype_resized_regist_cwp_root_handler);
+    CSPG_cwp_register_root_handler(CSP_CWP_FNC_DTYPE_DUP_REGIST,
+                                   CSPG_dtype_dup_regist_cwp_root_handler);
+    CSPG_cwp_register_root_handler(CSP_CWP_FNC_DTYPE_COMMIT, CSPG_dtype_commit_cwp_root_handler);
+    CSPG_cwp_register_root_handler(CSP_CWP_FNC_DTYPE_FREE, CSPG_dtype_free_cwp_root_handler);
+
+    CSPG_cwp_register_handler(CSP_CWP_FNC_DTYPE_CONTIG_REGIST,
+                              CSPG_dtype_contig_regist_cwp_handler);
+    CSPG_cwp_register_handler(CSP_CWP_FNC_DTYPE_VECTOR_REGIST,
+                              CSPG_dtype_vector_regist_cwp_handler);
+    CSPG_cwp_register_handler(CSP_CWP_FNC_DTYPE_HVECTOR_REGIST,
+                              CSPG_dtype_hvector_regist_cwp_handler);
+    CSPG_cwp_register_handler(CSP_CWP_FNC_DTYPE_IDX_BLK_REGIST,
+                              CSPG_dtype_idx_blk_regist_cwp_handler);
+    CSPG_cwp_register_handler(CSP_CWP_FNC_DTYPE_HIDX_BLK_REGIST,
+                              CSPG_dtype_hidx_blk_regist_cwp_handler);
+    CSPG_cwp_register_handler(CSP_CWP_FNC_DTYPE_INDEXED_REGIST,
+                              CSPG_dtype_indexed_regist_cwp_handler);
+    CSPG_cwp_register_handler(CSP_CWP_FNC_DTYPE_HINDEXED_REGIST,
+                              CSPG_dtype_hindexed_regist_cwp_handler);
+    CSPG_cwp_register_handler(CSP_CWP_FNC_DTYPE_STRUCT_REGIST,
+                              CSPG_dtype_struct_regist_cwp_handler);
+    CSPG_cwp_register_handler(CSP_CWP_FNC_DTYPE_SUBARRAY_REGIST,
+                              CSPG_dtype_subarray_regist_cwp_handler);
+    CSPG_cwp_register_handler(CSP_CWP_FNC_DTYPE_DARRAY_REGIST,
+                              CSPG_dtype_darray_regist_cwp_handler);
+    CSPG_cwp_register_handler(CSP_CWP_FNC_DTYPE_RESIZED_REGIST,
+                              CSPG_dtype_resized_regist_cwp_handler);
+    CSPG_cwp_register_handler(CSP_CWP_FNC_DTYPE_DUP_REGIST, CSPG_dtype_dup_regist_cwp_handler);
+    CSPG_cwp_register_handler(CSP_CWP_FNC_DTYPE_COMMIT, CSPG_dtype_commit_cwp_handler);
+    CSPG_cwp_register_handler(CSP_CWP_FNC_DTYPE_FREE, CSPG_dtype_free_cwp_handler);
 }
 
 int CSPG_datatype_init(void)
@@ -79,7 +129,6 @@ int CSPG_datatype_init(void)
     MPI_Datatype local_predefined_table[CSP_DATATYPE_MAX], temp_buf[CSP_DATATYPE_MAX];
 
     CSP_datatype_fill_predefined_table(local_predefined_table);
-    memset(&datatype_db, 0, sizeof(CSPG_datatype_db_t));
     CSP_CALLMPI(JUMP, PMPI_Comm_rank(CSP_PROC.local_comm, &local_rank));
 
     reqs = CSP_calloc(CSP_ENV.num_g, sizeof(MPI_Request));
@@ -94,9 +143,9 @@ int CSPG_datatype_init(void)
     }
     CSP_CALLMPI(JUMP, PMPI_Waitall(CSP_ENV.num_g, reqs, MPI_STATUS_IGNORE));
 
-    datatype_regist_ddts_init();
+    dtype_regist_handlers();
 
-    CSP_DBG_PRINT("DATATYPE: init done\n");
+    CSP_DBG_PRINT("DTYPE: init done\n");
 
   fn_exit:
     free(reqs);

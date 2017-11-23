@@ -581,19 +581,16 @@ int CSPU_ugcomm_create(MPI_Comm comm, MPI_Info info, MPI_Comm user_newcomm)
         ug_newcomm->type = CSP_COMM_SHMBUF;
     }
 
-    /* Only enable async when user only uses predefined datatype. */
-    if (ug_newcomm->info_args.datatype_used == CSP_COMM_INFO_DT_PREDEFINED) {
-        /* Enable async progress if ignore status or no ANY_SRC + specific TAG. */
-        if (!(ug_newcomm->info_args.wildcard_used & CSP_COMM_INFO_WD_ANYSRC) ||
-            (ug_newcomm->info_args.wildcard_used & CSP_COMM_INFO_WD_ANYTAG_NOTAG) ||
-            (ug_newcomm->info_args.wildcard_used & CSP_COMM_INFO_WD_NONE)) {
-            ug_newcomm->type = CSP_COMM_ASYNC_DUP;
-        }
-        /* Use tag translation instead of dupcomm. */
-        if ((ug_newcomm->info_args.wildcard_used & CSP_COMM_INFO_WD_NONE) &&
-            CSPU_offload_ch.tag_trans.trans_tag_nbits > 0 /* ensure sufficient bits exist. */) {
-            ug_newcomm->type = CSP_COMM_ASYNC_TAG;
-        }
+    /* Enable async progress if ignore status or no ANY_SRC + specific TAG. */
+    if (!(ug_newcomm->info_args.wildcard_used & CSP_COMM_INFO_WD_ANYSRC) ||
+        (ug_newcomm->info_args.wildcard_used & CSP_COMM_INFO_WD_ANYTAG_NOTAG) ||
+        (ug_newcomm->info_args.wildcard_used & CSP_COMM_INFO_WD_NONE)) {
+        ug_newcomm->type = CSP_COMM_ASYNC_DUP;
+    }
+    /* Use tag translation instead of dupcomm. */
+    if ((ug_newcomm->info_args.wildcard_used & CSP_COMM_INFO_WD_NONE) &&
+        CSPU_offload_ch.tag_trans.trans_tag_nbits > 0 /* ensure sufficient bits exist. */) {
+        ug_newcomm->type = CSP_COMM_ASYNC_TAG;
     }
 
     /* Return empty ug_comm if it is only reference use. */
